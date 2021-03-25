@@ -79,7 +79,7 @@ module.exports = (function () {
 			while (amount--) {
 				current = this.generateWord(current);
 				if (!current) {
-					current = this.word(null);
+					current = this.generateWord(null);
 				}
 
 				output.push(current);

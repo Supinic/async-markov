@@ -1,96 +1,44 @@
 module.exports = (function () {
-	const { Readable: ReadableStream } = require("stream");
-
-	const waitImmediate = () => new globalThis.Promise((resolve) => (
-		setImmediate(() => resolve())
-	));
+	const cleanupRegex = /[^\s\w\d?!.]/g;
+	const whitespaceRegex = /\s+/g;
+	const sentenceRegex = /[?!.]/;
 
 	return class AsyncMarkov {
 		#words = Object.create(null);
 		#hasSentences = false;
-		#busy = false;
-		#prepared = false;
 
-		async process (input, forceBlocking = false) {
-			if (this.#busy) {
+		add (string) {
+			if (!this.#hasSentences) {
+				this.#hasSentences = sentenceRegex.test(string);
+			}
+
+			const data = string.replace(cleanupRegex, "").replace(whitespaceRegex, " ").split(" ");
+			const length = data.length;
+			if (length < 2) {
 				return;
 			}
 
-			this.#busy = true;
+			for (let i = 1; i < length; i++) {
+				const first = data[i - 1];
+				const second = data[i];
 
-			if (typeof input === "string") {
-				await this.processString(input, forceBlocking);
-			}
-			else if (input instanceof Uint8Array) {
-				await this.processBuffer(Buffer.from(input), forceBlocking);
-			}
-			else if (input instanceof ReadableStream) {
-				await this.processStream(input, forceBlocking);
-			}
-			else {
-				throw new Error("Invalid input type provided");
-			}
+				if (typeof this.#words[first] === "undefined") {
+					this.#words[first] = {
+						total: 0,
+						related: {},
+						mapped: null
+					};
+				}
 
-			this.#busy = false;
-			this.#prepared = true;
+				if (typeof this.#words[first].related[second] === "undefined") {
+					this.#words[first].related[second] = 0;
+				}
+
+				this.#words[first].total++;
+				this.#words[first].related[second]++;
+			}
 
 			return this;
-		}
-
-		async processBuffer (buffer, forceBlocking) {
-			let first = "";
-			let second = "";
-			const length = buffer.length;
-			for (let i = 0; i < length; i++) {
-				const char = buffer[i];
-				if (!this.#hasSentences && (char === 33 || char === 46 || char === 63)) {
-					this.#hasSentences = true;
-				}
-
-				if (char === 32) {
-					if (first) {
-						this._addWords(first, second);
-						if (!forceBlocking) {
-							await waitImmediate();
-						}
-					}
-
-					first = second;
-					second = "";
-				}
-				else if (char > 32 && char < 127) {
-					second += String.fromCharCode(char);
-				}
-			}
-		}
-
-		processStream (stream, forceBlocking) {
-			return new Promise((resolve) => {
-				stream.on("data", (chunk) => {
-					this.processBuffer(chunk, forceBlocking);
-				});
-
-				stream.on("end", () => {
-					resolve();
-				});
-			});
-		}
-
-		async processString (string, forceBlocking) {
-
-			if (!this.#hasSentences) {
-				this.#hasSentences = (string.indexOf("?") !== -1 || string.indexOf("!") !== -1 || string.indexOf(".") !== -1);
-			}
-
-			const data = string.replace(/[^\w\d ]/g, "").replace(/\s+/g, " ").split(" ");
-			const length = data.length;
-
-			for (let i = 0; i < length; i++) {
-				this._addWords(data[i], data[i + 1]);
-				if (!forceBlocking) {
-					await waitImmediate();
-				}
-			}
 		}
 
 		finalize () {
@@ -100,8 +48,8 @@ module.exports = (function () {
 			}
 		}
 
-		word (root) {
-			if (!this.#prepared) {
+		generateWord (root) {
+			if (Object.keys(this.#words).length === 0) {
 				throw new Error("Cannot generate words, this model has no processed data");
 			}
 
@@ -113,11 +61,11 @@ module.exports = (function () {
 
 			const object = this.#words[root];
 			return (object)
-				? AsyncMarkov.weightedPick(object)
+				? AsyncMarkov.selectWeighted(object)
 				: null;
 		}
 
-		words (amount, root = null) {
+		generateWords (amount, root = null) {
 			if (amount <= 0 || Math.trunc(amount) !== amount || !Number.isFinite(amount)) {
 				throw new Error("Input amount must be a positive finite integer");
 			}
@@ -129,7 +77,7 @@ module.exports = (function () {
 			}
 
 			while (amount--) {
-				current = this.word(current);
+				current = this.generateWord(current);
 				if (!current) {
 					current = this.word(null);
 				}
@@ -138,11 +86,11 @@ module.exports = (function () {
 			}
 
 			return output.join(" ");
-		}
+		}h
 
-		sentences (amount, root = null) {
+		generateSentences (amount, root = null) {
 			if (!this.#hasSentences) {
-				throw new Error("Model data has no sentences - cannot re-create");
+				throw new Error("Model data does not contain delimiters - sentences cannot be generated");
 			}
 			else if (amount <= 0 || Math.trunc(amount) !== amount || !Number.isFinite(amount)) {
 				throw new Error("Amount of sentences must be a positive finite integer");
@@ -154,56 +102,48 @@ module.exports = (function () {
 				output.push(current);
 			}
 
-			while (amount >= 0) {
-				current = this.word(current);
+			while (amount > 0) {
+				current = this.generateWord(current);
 				output.push(current);
 
-				if (current.indexOf("?") !== -1 || current.indexOf("!") !== -1 || current.indexOf(".") !== -1) {
+				if (sentenceRegex.test(current)) {
 					amount--;
 				}
 			}
 
-			return output.join(" ");
+			return output.join(" ")
 		}
 
-		_addWords (first, second) {
-			if (typeof this.#words[first] === "undefined") {
-				this.#words[first] = {
-					total: 1,
-					related: {},
-					mapped: null
-				};
-			}
-			else {
-				this.#words[first].total++;
-			}
-
-			if (typeof this.#words[first].related[second] === "undefined") {
-				this.#words[first].related[second] = 1;
-			}
-			else {
-				this.#words[first].related[second]++;
-			}
-		}
-
-		save () {
-			return JSON.stringify({
+		toJSON () {
+			return {
 				data: this.#words,
 				hasSentences: this.#hasSentences
-			});
+			};
 		}
 
-		load (json) {
+		destroy () {
+			for (const first of Object.keys(this.#words)) {
+				this.#words[first].related = null;
+			}
+
+			this.#words = null;
+		}
+
+		get size () {
+			return Object.keys(this.#words).length;
+		}
+
+		static load (json) {
 			const data = JSON.parse(json);
-			this.#words = data.words;
-			this.#hasSentences = data.hasSentences;
+			const instance = new AsyncMarkov();
+
+			instance.#words = data.words;
+			instance.#hasSentences = data.hasSentences;
+
+			return instance;
 		}
 
-		get size () { return Object.keys(this.#words).length; }
-		get busy () { return this.#busy; }
-		get prepared () { return this.#prepared; }
-
-		static weightedPick (object) {
+		static selectWeighted (object) {
 			if (!object.mapped) {
 				AsyncMarkov.calculateWeights(object);
 			}

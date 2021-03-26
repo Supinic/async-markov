@@ -86,7 +86,7 @@ module.exports = (function () {
 			}
 
 			return output.join(" ");
-		}h
+		}
 
 		generateSentences (amount, root = null) {
 			if (!this.#hasSentences) {

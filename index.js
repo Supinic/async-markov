@@ -129,6 +129,10 @@ module.exports = (function () {
 			this.#words = null;
 		}
 
+		has (word) {
+			return Boolean(this.#words[word]);
+		}
+
 		get size () {
 			return Object.keys(this.#words).length;
 		}

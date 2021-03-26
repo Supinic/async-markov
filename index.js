@@ -1,5 +1,5 @@
 module.exports = (function () {
-	const cleanupRegex = /[^\s\w\d?!.]/g;
+	// const cleanupRegex = /[^\s\w\d?!.]/g;
 	const whitespaceRegex = /\s+/g;
 	const sentenceRegex = /[?!.]/;
 
@@ -12,7 +12,7 @@ module.exports = (function () {
 				this.#hasSentences = sentenceRegex.test(string);
 			}
 
-			const data = string.replace(cleanupRegex, "").replace(whitespaceRegex, " ").split(" ");
+			const data = string.replace(whitespaceRegex, " ").split(" ");
 			const length = data.length;
 			if (length < 2) {
 				return;

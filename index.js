@@ -4,7 +4,8 @@ module.exports = (function () {
 	const sentenceRegex = /[?!.]/;
 
 	return class AsyncMarkov {
-		#words = Object.create(null);
+		/** @type {Map<string, MarkovDescriptor>} */
+		#words = new Map();
 		#hasSentences = false;
 
 		add (string) {
@@ -22,50 +23,46 @@ module.exports = (function () {
 				const first = data[i - 1];
 				const second = data[i];
 
-				if (typeof this.#words[first] === "undefined") {
-					this.#words[first] = {
+				if (!this.#words.has(first)) {
+					this.#words.set(first, {
 						total: 0,
-						related: {},
-						mapped: null
-					};
+						mapped: false,
+						sums: null,
+						related: {}
+					});
 				}
 
-				if (typeof this.#words[first].related[second] === "undefined") {
-					this.#words[first].related[second] = 0;
+				const word = this.#words.get(first);
+				if (typeof word.related[second] === "undefined") {
+					word.related[second] = 0;
 				}
 
-				this.#words[first].total++;
-				this.#words[first].related[second]++;
+				word.total++;
+				word.mapped = false;
+				word.related[second]++;
 			}
 
 			return this;
 		}
 
-		finalize () {
-			const keys = Object.keys(this.#words);
-			for (let i = keys.length - 1; i >= 0; i--) {
-				AsyncMarkov.calculateWeights(this.#words[keys[i]]);
-			}
-		}
-
 		generateWord (root) {
-			if (Object.keys(this.#words).length === 0) {
+			if (this.#words.size === 0) {
 				throw new Error("Cannot generate words, this model has no processed data");
 			}
 
 			if (!root) {
-				const keys = Object.keys(this.#words);
+				const keys = [...this.#words.keys()];
 				const index = Math.trunc(Math.random() * keys.length);
 				root = keys[index];
 			}
 
-			const object = this.#words[root];
+			const object = this.#words.get(root);
 			return (object)
 				? AsyncMarkov.selectWeighted(object)
 				: null;
 		}
 
-		generateWords (amount, root = null) {
+		generateWords (amount, root = null, options = {}) {
 			if (amount <= 0 || Math.trunc(amount) !== amount || !Number.isFinite(amount)) {
 				throw new Error("Input amount must be a positive finite integer");
 			}
@@ -76,10 +73,16 @@ module.exports = (function () {
 				output.push(current);
 			}
 
+			const stop = Boolean(options.stop);
 			while (amount--) {
 				current = this.generateWord(current);
 				if (!current) {
-					current = this.generateWord(null);
+					if (stop) {
+						break;
+					}
+					else {
+						current = this.generateWord(null);
+					}
 				}
 
 				output.push(current);
@@ -114,57 +117,79 @@ module.exports = (function () {
 			return output.join(" ")
 		}
 
+		finalize () {
+			const keys = this.keys;
+			for (let i = keys.length - 1; i >= 0; i--) {
+				AsyncMarkov.calculateWeights(this.#words.get(keys[i]));
+			}
+		}
+
+		has (word) {
+			return this.#words.has(word);
+		}
+
 		toJSON () {
 			return {
-				data: this.#words,
+				data: [...this.#words.entries()],
 				hasSentences: this.#hasSentences
 			};
 		}
 
-		destroy () {
-			for (const first of Object.keys(this.#words)) {
-				this.#words[first].related = null;
+		reset () {
+			for (const value of this.#words.values()) {
+				value.related.clear();
 			}
 
+			this.#words.clear();
+		}
+
+		destroy () {
+			this.reset();
 			this.#words = null;
 		}
 
-		has (word) {
-			return Boolean(this.#words[word]);
+		get size () {
+			return this.#words.size;
 		}
 
-		get size () {
-			return Object.keys(this.#words).length;
+		get keys () {
+			return [...this.#words.keys()];
 		}
 
 		static load (json) {
 			const data = JSON.parse(json);
 			const instance = new AsyncMarkov();
 
-			instance.#words = data.words;
+			instance.#words = new Map(data.words);
 			instance.#hasSentences = data.hasSentences;
 
 			return instance;
 		}
 
 		static selectWeighted (object) {
-			if (!object.mapped) {
+			if (!object.sums || !object.mapped) {
 				AsyncMarkov.calculateWeights(object);
 			}
 
 			const roll = Math.trunc(Math.random() * object.total);
-			for (const pick of Object.keys(object.mapped)) {
+			const keys = Object.keys(object.sums);
+			for (let i = 0; i < keys.length; i++) {
+				const pick = keys[i];
 				if (roll < pick) {
-					return object.mapped[pick];
+					return object.sums[pick];
 				}
 			}
 
 			return null;
 		}
 
-		static calculateWeights (object) {
+		static calculateWeights (object, force = false) {
+			if (object.mapped === true && force === false) {
+				return;
+			}
+
 			let total = 0;
-			object.mapped = {};
+			object.sums = {};
 
 			const keys = Object.keys(object.related);
 			const length = keys.length;
@@ -173,8 +198,18 @@ module.exports = (function () {
 				const value = object.related[key];
 
 				total += value;
-				object.mapped[total] = key;
+				object.sums[total] = key;
 			}
+
+			object.mapped = true;
 		}
 	};
 })();
+
+/**
+ * @typedef {Object} MarkovDescriptor
+ * @property {number} total
+ * @property {boolean} mapped
+ * @property {Object} sums
+ * @property {Map<any,any>} related
+ */

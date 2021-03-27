@@ -137,7 +137,7 @@ module.exports = (function () {
 
 		reset () {
 			for (const value of this.#words.values()) {
-				value.related.clear();
+				value.related = {};
 			}
 
 			this.#words.clear();

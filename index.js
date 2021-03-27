@@ -13,7 +13,12 @@ module.exports = (function () {
 				this.#hasSentences = sentenceRegex.test(string);
 			}
 
-			const data = string.replace(whitespaceRegex, " ").split(" ");
+			const data = string
+				.trim()
+				.replace(whitespaceRegex, " ")
+				.split(" ")
+				.filter(Boolean);
+
 			const length = data.length;
 			if (length < 2) {
 				return;

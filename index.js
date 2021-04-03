@@ -142,6 +142,8 @@ module.exports = (function () {
 
 		load (input) {
 			const data = (typeof input === "string") ? JSON.parse(input) : input;
+
+			this.reset();
 			this.#words = new Map(data.words);
 			this.#hasSentences = data.hasSentences;
 

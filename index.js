@@ -135,7 +135,7 @@ module.exports = (function () {
 
 		toJSON () {
 			return {
-				data: [...this.#words.entries()],
+				words: [...this.#words.entries()],
 				hasSentences: this.#hasSentences
 			};
 		}

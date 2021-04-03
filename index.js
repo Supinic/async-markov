@@ -140,6 +140,14 @@ module.exports = (function () {
 			};
 		}
 
+		load (input) {
+			const data = (typeof input === "string") ? JSON.parse(input) : input;
+			this.#words = new Map(data.words);
+			this.#hasSentences = data.hasSentences;
+
+			return this;
+		}
+
 		reset () {
 			for (const value of this.#words.values()) {
 				value.related = {};
@@ -161,12 +169,9 @@ module.exports = (function () {
 			return [...this.#words.keys()];
 		}
 
-		static load (json) {
-			const data = JSON.parse(json);
+		static create (input) {
 			const instance = new AsyncMarkov();
-
-			instance.#words = new Map(data.words);
-			instance.#hasSentences = data.hasSentences;
+			instance.load(input);
 
 			return instance;
 		}

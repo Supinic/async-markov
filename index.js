@@ -1,5 +1,4 @@
 module.exports = (function () {
-	// const cleanupRegex = /[^\s\w\d?!.]/g;
 	const whitespaceRegex = /\s+/g;
 	const sentenceRegex = /[?!.]/;
 
@@ -7,6 +6,7 @@ module.exports = (function () {
 		/** @type {Map<string, MarkovDescriptor>} */
 		#words = new Map();
 		#hasSentences = false;
+		#edges = 0;
 
 		add (string) {
 			if (!this.#hasSentences) {
@@ -42,6 +42,7 @@ module.exports = (function () {
 					word.related[second] = 0;
 				}
 
+				this.#edges++;
 				word.total++;
 				word.mapped = false;
 				word.related[second]++;
@@ -134,7 +135,9 @@ module.exports = (function () {
 		}
 
 		toJSON () {
+			this.finalize();
 			return {
+				edges: this.#edges,
 				words: [...this.#words.entries()],
 				hasSentences: this.#hasSentences
 			};
@@ -144,8 +147,21 @@ module.exports = (function () {
 			const data = (typeof input === "string") ? JSON.parse(input) : input;
 
 			this.reset();
-			this.#words = new Map(data.words);
 			this.#hasSentences = data.hasSentences;
+			this.#words = new Map(data.words);
+
+			if (typeof data.edges === "number") {
+				this.#edges = data.edges;
+			}
+			else {
+				const iterator = this.#words.values();
+				let it = iterator.next();
+
+				while (!it.done) {
+					this.#edges += it.value.total ?? 0;
+					it = iterator.next();
+				}
+			}
 
 			return this;
 		}
@@ -169,6 +185,10 @@ module.exports = (function () {
 
 		get keys () {
 			return [...this.#words.keys()];
+		}
+
+		get edges () {
+			return this.#edges;
 		}
 
 		static create (input) {

@@ -18,10 +18,12 @@ declare interface InitNode extends Node {
 declare interface MappedNode extends Node {
 	mapped: true;
 	sums: Record<string, Word>;
+	related: Record<Word, number>;
 }
 declare interface InvalidatedNode extends Node {
 	mapped: false;
 	sums: Record<string, Word>;
+	related: Record<Word, number>;
 }
 
 declare type Representation = {

@@ -16,7 +16,7 @@ declare type InvalidatedNode = {
 	total: number;
 	related: Record<Word, number>;
 }
-declare type Node =  MappedNode | InvalidatedNode;
+declare type Node = MappedNode | InvalidatedNode;
 
 declare type Representation = {
 	edges: number;

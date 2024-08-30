@@ -4,27 +4,19 @@ const sentenceRegex = /[?!.]/;
 declare type Word = string;
 declare type Sentence = string;
 
-declare interface Node {
-	mapped: boolean;
-	related: Record<Word, number>;
-	sums: Record<string, Word> | null;
-	total: number;
-}
-declare interface InitNode extends Node {
-	mapped: false;
-	sums: null;
-	total: 0;
-}
-declare interface MappedNode extends Node {
+declare type MappedNode = {
 	mapped: true;
 	sums: Record<string, Word>;
+	total: number;
 	related: Record<Word, number>;
 }
-declare interface InvalidatedNode extends Node {
+declare type InvalidatedNode = {
 	mapped: false;
 	sums: Record<string, Word>;
+	total: number;
 	related: Record<Word, number>;
 }
+declare type Node =  MappedNode | InvalidatedNode;
 
 declare type Representation = {
 	edges: number;
@@ -62,17 +54,21 @@ class AsyncMarkov {
 			const second = data[i];
 
 			if (!this.#nodes.has(first)) {
-				const initNode: InitNode = {
+				const initNode: InvalidatedNode = {
 					total: 0,
 					mapped: false,
-					sums: null,
+					sums: {},
 					related: {}
 				};
 
 				this.#nodes.set(first, initNode);
 			}
 
-			const node = this.#nodes.get(first) as Node;
+			const node = this.#nodes.get(first);
+			if (!node) {
+				return; // Will never happen
+			}
+
 			if (typeof node.related[second] === "undefined") {
 				node.related[second] = 0;
 			}
@@ -246,8 +242,6 @@ class AsyncMarkov {
 		}
 
 		let total = 0;
-		node.sums = {};
-
 		const keys = Object.keys(node.related);
 		const length = keys.length;
 		for (let i = 0; i < length; i++) {

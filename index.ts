@@ -258,11 +258,3 @@ class AsyncMarkov {
 }
 
 export = AsyncMarkov;
-
-/**
- * @typedef {Object} MarkovDescriptor
- * @property {number} total
- * @property {boolean} mapped
- * @property {Object} sums
- * @property {Map<any,any>} related
- */

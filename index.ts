@@ -37,7 +37,7 @@ const isMappedNode = (node: Node): node is MappedNode => {
 };
 
 class AsyncMarkov {
-	#words: Map<Word, Node> = new Map();
+	#nodes: Map<Word, Node> = new Map();
 	#hasSentences = false;
 	#edges = 0;
 
@@ -61,7 +61,7 @@ class AsyncMarkov {
 			const first = data[i - 1];
 			const second = data[i];
 
-			if (!this.#words.has(first)) {
+			if (!this.#nodes.has(first)) {
 				const initNode: InitNode = {
 					total: 0,
 					mapped: false,
@@ -69,35 +69,35 @@ class AsyncMarkov {
 					related: {}
 				};
 
-				this.#words.set(first, initNode);
+				this.#nodes.set(first, initNode);
 			}
 
-			const word = this.#words.get(first) as Node;
-			if (typeof word.related[second] === "undefined") {
-				word.related[second] = 0;
+			const node = this.#nodes.get(first) as Node;
+			if (typeof node.related[second] === "undefined") {
+				node.related[second] = 0;
 			}
 
 			this.#edges++;
-			word.total++;
-			word.mapped = false;
-			word.related[second]++;
+			node.total++;
+			node.mapped = false;
+			node.related[second]++;
 		}
 
 		return this;
 	}
 
 	generateWord (root: Word | null): Word | null {
-		if (this.#words.size === 0) {
+		if (this.#nodes.size === 0) {
 			throw new Error("Cannot generate words, this model has no processed data");
 		}
 
 		if (!root) {
-			const keys = [...this.#words.keys()];
+			const keys = [...this.#nodes.keys()];
 			const index = Math.trunc(Math.random() * keys.length);
 			root = keys[index];
 		}
 
-		const object = this.#words.get(root);
+		const object = this.#nodes.get(root);
 		return (object)
 			? AsyncMarkov.selectWeighted(object)
 			: null;
@@ -159,20 +159,20 @@ class AsyncMarkov {
 	}
 
 	finalize () {
-		for (const node of this.#words.values()) {
+		for (const node of this.#nodes.values()) {
 			AsyncMarkov.calculateWeights(node);
 		}
 	}
 
 	has (word: Word) {
-		return this.#words.has(word);
+		return this.#nodes.has(word);
 	}
 
 	toJSON (): Representation {
 		this.finalize();
 		return {
 			edges: this.#edges,
-			words: [...this.#words.entries()],
+			words: [...this.#nodes.entries()],
 			hasSentences: this.#hasSentences
 		};
 	}
@@ -182,13 +182,13 @@ class AsyncMarkov {
 
 		this.reset();
 		this.#hasSentences = data.hasSentences;
-		this.#words = new Map(data.words);
+		this.#nodes = new Map(data.words);
 
 		if (typeof data.edges === "number") {
 			this.#edges = data.edges;
 		}
 		else {
-			const iterator = this.#words.values();
+			const iterator = this.#nodes.values();
 			let it = iterator.next();
 
 			while (!it.done) {
@@ -201,15 +201,15 @@ class AsyncMarkov {
 	}
 
 	reset () {
-		this.#words.clear();
+		this.#nodes.clear();
 	}
 
 	get size () {
-		return this.#words.size;
+		return this.#nodes.size;
 	}
 
 	get keys () {
-		return [...this.#words.keys()];
+		return [...this.#nodes.keys()];
 	}
 
 	get edges () {

@@ -1,24 +1,24 @@
 const whitespaceRegex = /\s+/g;
 const sentenceRegex = /[?!.]/;
 
-declare type Word = string;
-declare type Sentence = string;
+type Word = string;
+type Sentence = string;
 
-declare type MappedNode = {
+type MappedNode = {
 	mapped: true;
 	sums: Record<string, Word>;
 	total: number;
 	related: Record<Word, number>;
 }
-declare type InvalidatedNode = {
+type InvalidatedNode = {
 	mapped: false;
 	sums: Record<string, Word>;
 	total: number;
 	related: Record<Word, number>;
 }
-declare type Node = MappedNode | InvalidatedNode;
+type Node = MappedNode | InvalidatedNode;
 
-declare type Representation = {
+type Representation = {
 	edges: number;
 	words: [Word, Node][];
 	hasSentences: boolean;
@@ -33,7 +33,7 @@ class AsyncMarkov {
 	#hasSentences = false;
 	#edges = 0;
 
-	add (string: string) {
+	add (string: string): this {
 		if (!this.#hasSentences) {
 			this.#hasSentences = sentenceRegex.test(string);
 		}
@@ -46,7 +46,7 @@ class AsyncMarkov {
 
 		const length = data.length;
 		if (length < 2) {
-			return;
+			return this;
 		}
 
 		for (let i = 1; i < length; i++) {
@@ -66,7 +66,7 @@ class AsyncMarkov {
 
 			const node = this.#nodes.get(first);
 			if (!node) {
-				return; // Will never happen
+				return this; // Will never happen
 			}
 
 			if (typeof node.related[second] === "undefined") {
@@ -154,13 +154,13 @@ class AsyncMarkov {
 		return output.join(" ");
 	}
 
-	finalize () {
+	finalize (): void {
 		for (const node of this.#nodes.values()) {
 			AsyncMarkov.calculateWeights(node);
 		}
 	}
 
-	has (word: Word) {
+	has (word: Word): boolean {
 		return this.#nodes.has(word);
 	}
 
@@ -173,7 +173,7 @@ class AsyncMarkov {
 		};
 	}
 
-	load (input: string | Representation) {
+	load (input: string | Representation): this {
 		const data = (typeof input === "string") ? JSON.parse(input) : input;
 
 		this.reset();
@@ -196,23 +196,23 @@ class AsyncMarkov {
 		return this;
 	}
 
-	reset () {
+	reset (): void {
 		this.#nodes.clear();
 	}
 
-	get size () {
+	get size (): number {
 		return this.#nodes.size;
 	}
 
-	get keys () {
+	get keys (): string[] {
 		return [...this.#nodes.keys()];
 	}
 
-	get edges () {
+	get edges (): number {
 		return this.#edges;
 	}
 
-	static create (input: string | Representation) {
+	static create (input: string | Representation): AsyncMarkov {
 		const instance = new AsyncMarkov();
 		instance.load(input);
 
